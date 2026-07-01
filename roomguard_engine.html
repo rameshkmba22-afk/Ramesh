@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RoomGuard Engine</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#1f2937; --bg:#f4f6f8; --line:#e2e6ea; --muted:#6b7480;
+    --accent:#2f5fc4; --good:#1f7a4d; --bad:#b3421f; --card:#fff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;}
+  .topbar{background:#fff;border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .topbar h1{font-size:17px;margin:0;font-weight:700;}
+  .topbar .tag{font-size:11px;color:var(--muted);}
+  .modetabs{display:flex;gap:6px;}
+  .modetab{padding:7px 16px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);}
+  .modetab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .layout{display:grid;grid-template-columns:250px 1fr;min-height:calc(100vh - 56px);}
+  .sidebar{background:#fff;border-right:1px solid var(--line);padding:12px;overflow-y:auto;max-height:calc(100vh - 56px);}
+  .sidebar h3{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px;}
+  .searchbox{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;margin-bottom:8px;}
+  .hosp-card{border:1px solid var(--line);border-radius:7px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:.12s;}
+  .hosp-card:hover{border-color:var(--accent);}
+  .hosp-card.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .hosp-card .hname{font-weight:600;font-size:12px;}
+  .hosp-card .hmeta{font-size:10.5px;color:var(--muted);margin-top:2px;}
+  .hosp-card.active .hmeta,.hosp-card.active .hcount{color:#dbe5fb;}
+  .hosp-card .hcount{font-size:10px;margin-top:2px;color:var(--muted);}
+  .all-link{font-size:11.5px;color:var(--accent);cursor:pointer;margin-bottom:8px;display:inline-block;}
+  .main{padding:14px 18px;overflow-x:auto;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;}
+  .panel h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:7px;}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+  select,input[type=file]{font-size:12.5px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;}
+  button{font-size:12px;padding:6px 13px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px;cursor:pointer;}
+  button.ghost{background:#fff;color:var(--accent);}
+  button:hover{opacity:.88;}
+  .dropzone{border:1.5px dashed var(--line);border-radius:8px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:#eef3fc;}
+  .colmap{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;}
+  /* category multi-select dropdown */
+  .cat-dropdown{position:relative;display:inline-block;min-width:220px;}
+  .cat-btn{width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer;font-size:12.5px;text-align:left;display:flex;justify-content:space-between;align-items:center;}
+  .cat-btn:after{content:'▾';color:var(--muted);}
+  .cat-menu{display:none;position:absolute;top:100%;left:0;z-index:100;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:0 4px 16px rgba(0,0,0,.12);padding:6px 0;min-width:220px;max-height:300px;overflow-y:auto;}
+  .cat-menu.open{display:block;}
+  .cat-menu label{display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-size:12.5px;}
+  .cat-menu label:hover{background:#f4f6f8;}
+  .cat-menu .divider{border-top:1px solid var(--line);margin:4px 0;}
+  .cat-menu .sel-all{padding:5px 14px;font-size:11.5px;color:var(--accent);cursor:pointer;font-weight:600;}
+  /* tabs */
+  .tabs{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;}
+  .tab{padding:5px 13px;border-radius:20px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:11.5px;color:var(--muted);}
+  .tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  /* variance */
+  .vbtngrp{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;}
+  .vbtn{padding:5px 11px;border-radius:6px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:11.5px;}
+  .vbtn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .vbtn.minus.active{background:var(--good);border-color:var(--good);}
+  .vbtn.plus.active{background:var(--bad);border-color:var(--bad);}
+  /* table */
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;max-height:60vh;overflow-y:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th,td{padding:7px 11px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;}
+  th{background:#fafbfc;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);position:sticky;top:0;z-index:2;}
+  th.basecol,td.basecol{background:#f0f4fb;}
+  th.inscol2,td.inscol2{background:#f3f9f5;}
+  th.grphead{background:#e8ecf5;color:var(--ink);font-size:10.5px;font-weight:700;text-align:center;border-left:2px solid var(--accent);}
+  th.grphead2{background:#e6f3ec;color:#1a5c3a;font-size:10.5px;font-weight:700;text-align:center;border-left:2px solid var(--good);}
+  th.grpheadR{background:#f5f0e8;color:#6b4c1a;font-size:10.5px;font-weight:700;text-align:center;border-left:2px solid #c8922a;}
+  tr:hover td{background:#f7f9fc;}
+  .badge{font-size:10px;padding:1px 5px;border-radius:8px;margin-left:3px;}
+  .badge.up{background:#fbe9e4;color:var(--bad);}
+  .badge.down{background:#e3f2e9;color:var(--good);}
+  .badge.same{background:#eee;color:var(--muted);}
+  /* remark pills */
+  .rem{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:9px;font-weight:600;white-space:nowrap;}
+  .rem.a{background:#dbeafe;color:#1e40af;}
+  .rem.b{background:#dcfce7;color:#166534;}
+  .rem.same{background:#f3f4f6;color:#6b7280;}
+  .rem.na{background:#fef3c7;color:#92400e;font-weight:400;}
+  .rem.dtd{background:#fce7f3;color:#9d174d;}
+  /* summary */
+  .summary-strip{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:7px;padding:8px 12px;min-width:120px;}
+  .stat .v{font-size:16px;font-weight:700;}
+  .stat .l{font-size:10px;color:var(--muted);}
+  .matchcount{font-size:11px;color:var(--muted);}
+  .footnote{font-size:10px;color:var(--muted);margin-top:7px;}
+  .err{color:var(--bad);font-size:12px;margin-top:5px;}
+  .empty{text-align:center;color:var(--muted);padding:50px 20px;}
+  .pagebar{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;flex-wrap:wrap;gap:7px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <h1>RoomGuard Engine</h1>
+    <span class="tag">Room-rent rate analysis across empanelled insurers</span>
+  </div>
+  <div class="modetabs" id="modetabs" style="display:none;">
+    <div class="modetab active" data-mode="multi" onclick="switchMode('multi')">📊 Multi-Insurer Grid</div>
+    <div class="modetab" data-mode="h2h" onclick="switchMode('h2h')">⚖️ Head-to-Head</div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar" id="sidebar" style="display:none;">
+    <h3>Hospital Registry</h3>
+    <input class="searchbox" id="hospSearch" placeholder="Search hospital or HID...">
+    <span class="all-link" id="allHospLink">▾ All hospitals</span>
+    <div id="hospList"></div>
+  </div>
+
+  <div class="main">
+    <!-- UPLOAD -->
+    <div class="panel" id="uploadPanel">
+      <h2>Step 1 · Load Data</h2>
+      <div class="dropzone" id="dropzone">
+        <div id="dzText">Drop your room-rent Excel / CSV here, or click to browse<br><span style="font-size:11px;">.xlsx · .xls · .csv</span></div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+      </div>
+      <div id="fileErr" class="err"></div>
+    </div>
+
+    <!-- MAPPING -->
+    <div class="panel" id="mapPanel" style="display:none;">
+      <h2>Step 2 · Map Columns</h2>
+      <div class="colmap" id="colmapGrid"></div>
+      <div class="footnote">Sheet: <span id="colCount"></span> columns · <span id="rowCount"></span> rows</div>
+      <div class="row" style="margin-top:10px;"><button id="applyMap">Apply mapping &amp; continue →</button></div>
+    </div>
+
+    <!-- MULTI PANEL -->
+    <div id="multiPanel" style="display:none;">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px;">
+          <div class="row" style="gap:10px;">
+            <div class="field"><label>Base Rate</label><select id="baseInsurer"></select></div>
+            <div class="field"><label>AC / Non-AC</label>
+              <select id="acFilter"><option value="">Both</option><option value="AC">AC only</option><option value="Non AC">Non-AC only</option></select>
+            </div>
+            <div class="field"><label>Nursing</label><select id="includeNursing"><option value="1">Include</option><option value="0">Exclude</option></select></div>
+            <div class="field"><label>DMO</label><select id="includeDmo"><option value="1">Include</option><option value="0">Exclude</option></select></div>
+          </div>
+          <button class="ghost" id="exportCsv">⬇ Export CSV</button>
+        </div>
+        <div class="tabs" id="categoryTabs"></div>
+        <div class="vbtngrp">
+          <div class="vbtn active" id="vAll" onclick="setVariance('all')">All Rates</div>
+          <div class="vbtn minus" id="vMinus" onclick="setVariance('minus')">Minus (%) Discounts</div>
+          <div class="vbtn plus" id="vPlus" onclick="setVariance('plus')">Plus (%) Loaded</div>
+        </div>
+        <div class="summary-strip" id="summaryStrip"></div>
+        <div class="pagebar">
+          <div class="matchcount" id="matchCount"></div>
+          <div class="row" style="gap:5px;align-items:center;">
+            <button class="ghost" id="prevPage">‹</button>
+            <span class="matchcount" id="pageInfo"></span>
+            <button class="ghost" id="nextPage">›</button>
+            <select id="pageSize"><option value="50">50/page</option><option value="100" selected>100/page</option><option value="250">250/page</option><option value="500">500/page</option></select>
+          </div>
+        </div>
+        <div class="tablewrap">
+          <table><thead><tr id="theadRow"></tr></thead><tbody id="resultsBody"></tbody></table>
+        </div>
+        <div class="footnote">* Variant = multiple distinct rates for same category at this hospital (e.g. floor/view-based). Matched to nearest base value.</div>
+      </div>
+    </div>
+
+    <!-- H2H PANEL -->
+    <div id="h2hPanel" style="display:none;">
+      <div class="panel">
+        <h2>Head-to-Head · Side-by-Side Dual Analysis</h2>
+        <div class="row" style="gap:12px;align-items:flex-end;margin-bottom:12px;">
+          <div class="field"><label>Insurer A (Reference)</label><select id="h2hA"></select></div>
+          <div class="field"><label>Insurer B (Comparison)</label><select id="h2hB"></select></div>
+          <div class="field">
+            <label>Ward Categories to Show</label>
+            <div class="cat-dropdown" id="catDropdown">
+              <button type="button" class="cat-btn" id="catBtn">All Categories</button>
+              <div class="cat-menu" id="catMenu">
+                <div class="sel-all" id="selAll">☑ Select All</div>
+                <div class="sel-all" id="selNone">☐ Clear All</div>
+                <div class="divider"></div>
+                <div id="catCheckboxes"></div>
+              </div>
+            </div>
+          </div>
+          <div class="field"><label>AC / Non-AC</label>
+            <select id="h2hAcFilter"><option value="">Both</option><option value="AC">AC only</option><option value="Non AC">Non-AC only</option></select>
+          </div>
+          <div class="field"><label>Nursing</label><select id="h2hNursing"><option value="0" selected>Exclude</option><option value="1">Include</option></select></div>
+          <div class="field"><label>DMO</label><select id="h2hDmo"><option value="0" selected>Exclude</option><option value="1">Include</option></select></div>
+          <button class="ghost" id="h2hExport">⬇ Export CSV</button>
+        </div>
+        <div class="vbtngrp" id="h2hVbtnGrp">
+          <div class="vbtn active" id="h2hVAll" onclick="setH2HVariance('all')">All Comparisons</div>
+          <div class="vbtn" id="h2hVA" onclick="setH2HVariance('a')">A Better Only</div>
+          <div class="vbtn" id="h2hVB" onclick="setH2HVariance('b')">B Better Only</div>
+          <div class="vbtn" id="h2hVSame" onclick="setH2HVariance('same')">Same Price Only</div>
+          <div class="vbtn" id="h2hVNA" onclick="setH2HVariance('na')">Missing Rates</div>
+          <div class="vbtn" id="h2hVDtd" onclick="setH2HVariance('dtd')">Difficult to Decide</div>
+        </div>
+        <div class="summary-strip" id="h2hSummary"></div>
+        <div class="pagebar">
+          <div class="matchcount" id="h2hMatchCount"></div>
+          <div class="row" style="gap:5px;align-items:center;">
+            <button class="ghost" id="h2hPrev">‹</button>
+            <span class="matchcount" id="h2hPageInfo"></span>
+            <button class="ghost" id="h2hNext">›</button>
+            <select id="h2hPageSize"><option value="50">50/page</option><option value="100" selected>100/page</option><option value="250">250/page</option></select>
+          </div>
+        </div>
+        <div class="tablewrap">
+          <table><thead id="h2hThead"></thead><tbody id="h2hBody"></tbody></table>
+        </div>
+        <div class="footnote">
+          <span class="rem a">A Better</span> A rate is lower &nbsp;
+          <span class="rem b">B Better</span> B rate is lower &nbsp;
+          <span class="rem same">Same Price</span> identical &nbsp;
+          <span class="rem na">Rate Missing</span> not empanelled &nbsp;
+          <span class="rem dtd">Difficult to Decide</span> mixed across wards — some A better, some B better
+        </div>
+      </div>
+    </div>
+
+    <div class="empty" id="emptyState">
+      Upload your room-rent sheet to get started.<br>
+      <b>Required:</b> HospID · HospName · RoomCategory · RoomRent/day · Inscompname<br>
+      <b>Optional:</b> NursingCharges · DMOCharges · AC/NonAC
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let rawRows=[],headers=[],mapping={},data=[];
+let selectedHosp='',selectedCategory='',varianceMode='all';
+let currentPage=1,pageSize=100,allMatchedRows=[],currentInsurersInPool=[];
+let lastRenderRows=[];
+let activeMode='multi';
+let h2hVarianceMode='all',h2hPage=1,h2hPageSize=100,h2hAllRows=[];
+let selectedCats=new Set(); // for H2H multi-select
+
+const FIELD_DEFS=[
+  {key:'hospid',   label:'Hospital ID',          guess:['hospid','hospitalid']},
+  {key:'hospname', label:'Hospital Name',         guess:['hospname','hospitalname']},
+  {key:'category', label:'Room Category',         guess:['roomcategory','category']},
+  {key:'roomrent', label:'Room Rent / day',       guess:['roomrent_perday','roomrent','roomrentperday']},
+  {key:'nursing',  label:'Nursing Charges / day', guess:['nursingcharges_perday','nursing','nursingcharges']},
+  {key:'dmo',      label:'DMO Charges / day',     guess:['dmocharges_perday','dmo','dmocharges']},
+  {key:'ac',       label:'AC / Non-AC',           guess:['roomacnonac','acnonac','ac']},
+  {key:'insurer',  label:'Insurance Company',     guess:['inscompname','insurer','insurance','insurancename']},
+];
+
+// ── File upload ───────────────────────────────────────────────────────────────
+const dropzone=document.getElementById('dropzone');
+const fileInput=document.getElementById('fileInput');
+dropzone.addEventListener('click',()=>fileInput.click());
+dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('drag');});
+dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.classList.remove('drag');if(e.dataTransfer.files.length)handleFile(e.dataTransfer.files[0]);});
+fileInput.addEventListener('change',e=>{if(e.target.files.length)handleFile(e.target.files[0]);});
+
+function handleFile(file){
+  document.getElementById('fileErr').textContent='';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const json=XLSX.utils.sheet_to_json(sheet,{header:1,defval:''});
+      if(json.length<2){document.getElementById('fileErr').textContent='No data rows found.';return;}
+      headers=json[0].map(h=>String(h).trim());
+      rawRows=json.slice(1).filter(r=>r.some(c=>c!==''));
+      document.getElementById('dzText').innerHTML=`<b>${file.name}</b> — ${rawRows.length.toLocaleString()} rows. Click to replace.`;
+      buildColumnMapping();
+    }catch(err){document.getElementById('fileErr').textContent='Could not read file: '+err.message;}
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ── Column mapping ────────────────────────────────────────────────────────────
+function buildColumnMapping(){
+  const grid=document.getElementById('colmapGrid');
+  grid.innerHTML='';
+  document.getElementById('colCount').textContent=headers.length;
+  document.getElementById('rowCount').textContent=rawRows.length.toLocaleString();
+  FIELD_DEFS.forEach(f=>{
+    const div=document.createElement('div');div.className='field';
+    const lbl=document.createElement('label');lbl.textContent=f.label;
+    const sel=document.createElement('select');sel.id='map_'+f.key;
+    sel.appendChild(Object.assign(document.createElement('option'),{value:'-1',textContent:'— not in sheet —'}));
+    headers.forEach((h,i)=>sel.appendChild(Object.assign(document.createElement('option'),{value:i,textContent:h||`Col ${i+1}`})));
+    const gi=headers.findIndex(h=>f.guess.some(g=>h.toLowerCase().replace(/[^a-z0-9]/g,'').includes(g.replace(/[^a-z0-9]/g,''))));
+    if(gi>=0)sel.value=gi;
+    div.appendChild(lbl);div.appendChild(sel);grid.appendChild(div);
+  });
+  document.getElementById('mapPanel').style.display='block';
+}
+
+document.getElementById('applyMap').addEventListener('click',applyMapping);
+function applyMapping(){
+  mapping={};
+  FIELD_DEFS.forEach(f=>{const v=document.getElementById('map_'+f.key).value;mapping[f.key]=v==='-1'?null:parseInt(v);});
+  if(mapping.roomrent===null||mapping.category===null||mapping.insurer===null){alert('Map at least Room Category, Room Rent/day, and Insurance Company.');return;}
+  const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n;};
+  data=rawRows.map(r=>({
+    hospid:   mapping.hospid!==null   ?String(r[mapping.hospid]).trim()   :'',
+    hospname: mapping.hospname!==null ?String(r[mapping.hospname]).trim() :(mapping.hospid!==null?String(r[mapping.hospid]).trim():'Unknown'),
+    category: String(r[mapping.category]).trim(),
+    roomrent: num(r[mapping.roomrent]),
+    nursing:  mapping.nursing!==null  ?num(r[mapping.nursing])  :0,
+    dmo:      mapping.dmo!==null      ?num(r[mapping.dmo])      :0,
+    ac:       mapping.ac!==null       ?String(r[mapping.ac]).trim()      :'',
+    insurer:  String(r[mapping.insurer]).trim()
+  })).filter(r=>r.category&&r.insurer);
+
+  populateSidebar();
+  populateMultiControls();
+  populateH2HControls();
+  document.getElementById('sidebar').style.display='block';
+  document.getElementById('modetabs').style.display='flex';
+  document.getElementById('emptyState').style.display='none';
+  switchMode('multi');
+}
+
+// ── Mode switch ───────────────────────────────────────────────────────────────
+function switchMode(mode){
+  activeMode=mode;
+  document.querySelectorAll('.modetab').forEach(t=>t.classList.toggle('active',t.dataset.mode===mode));
+  document.getElementById('multiPanel').style.display=mode==='multi'?'block':'none';
+  document.getElementById('h2hPanel').style.display=mode==='h2h'?'block':'none';
+  if(mode==='multi')render(); else renderH2H();
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+function populateSidebar(){
+  const byHosp={};
+  data.forEach(r=>{
+    if(!byHosp[r.hospid])byHosp[r.hospid]={name:r.hospname,count:0,ins:new Set()};
+    byHosp[r.hospid].count++;byHosp[r.hospid].ins.add(r.insurer);
+  });
+  const list=document.getElementById('hospList');list.innerHTML='';
+  Object.keys(byHosp).sort((a,b)=>byHosp[a].name.localeCompare(byHosp[b].name)).forEach(hid=>{
+    const h=byHosp[hid];
+    const div=document.createElement('div');
+    div.className='hosp-card'+(selectedHosp===hid?' active':'');
+    div.innerHTML=`<div class="hname">${h.name}</div><div class="hmeta">HID: ${hid}</div><div class="hcount">${h.count} rows · ${h.ins.size} ins.</div>`;
+    div.onclick=()=>{selectedHosp=hid;currentPage=1;h2hPage=1;populateSidebar();activeMode==='multi'?render():renderH2H();};
+    list.appendChild(div);
+  });
+  document.getElementById('allHospLink').onclick=()=>{selectedHosp='';currentPage=1;h2hPage=1;populateSidebar();activeMode==='multi'?render():renderH2H();};
+  document.getElementById('hospSearch').oninput=e=>{
+    const q=e.target.value.toLowerCase();
+    list.querySelectorAll('.hosp-card').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
+  };
+}
+
+// ── Multi-insurer ─────────────────────────────────────────────────────────────
+function populateMultiControls(){
+  const insurers=[...new Set(data.map(r=>r.insurer))].sort();
+  const cats=[...new Set(data.map(r=>r.category))].sort();
+  const baseSel=document.getElementById('baseInsurer');baseSel.innerHTML='';
+  insurers.forEach(i=>{const o=document.createElement('option');o.value=i;o.textContent=i;if(i.toLowerCase().includes('medi assist'))o.selected=true;baseSel.appendChild(o);});
+  const tabsDiv=document.getElementById('categoryTabs');tabsDiv.innerHTML='';
+  const allTab=document.createElement('div');allTab.className='tab active';allTab.textContent='All Categories';
+  allTab.onclick=()=>{selectedCategory='';currentPage=1;[...tabsDiv.children].forEach(c=>c.classList.remove('active'));allTab.classList.add('active');render();};
+  tabsDiv.appendChild(allTab);
+  cats.forEach(c=>{
+    const t=document.createElement('div');t.className='tab';t.textContent=c;
+    t.onclick=()=>{selectedCategory=c;currentPage=1;[...tabsDiv.children].forEach(x=>x.classList.remove('active'));t.classList.add('active');render();};
+    tabsDiv.appendChild(t);
+  });
+  [baseSel,document.getElementById('acFilter'),document.getElementById('includeNursing'),document.getElementById('includeDmo')]
+    .forEach(el=>el.addEventListener('change',()=>{currentPage=1;render();}));
+  document.getElementById('exportCsv').addEventListener('click',exportMultiCsv);
+  document.getElementById('pageSize').addEventListener('change',e=>{pageSize=parseInt(e.target.value);currentPage=1;renderMultiPage();});
+  document.getElementById('prevPage').onclick=()=>{if(currentPage>1){currentPage--;renderMultiPage();}};
+  document.getElementById('nextPage').onclick=()=>{const max=Math.max(1,Math.ceil(allMatchedRows.length/pageSize));if(currentPage<max){currentPage++;renderMultiPage();}};
+}
+
+function setVariance(mode){
+  varianceMode=mode;currentPage=1;
+  document.querySelectorAll('#multiPanel .vbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('v'+mode.charAt(0).toUpperCase()+mode.slice(1)).classList.add('active');
+  render();
+}
+
+const fmt=n=>n===null||n===undefined?'—':'₹'+n.toLocaleString('en-IN',{maximumFractionDigits:0});
+
+function render(){
+  const baseInsurer=document.getElementById('baseInsurer').value;
+  const acF=document.getElementById('acFilter').value;
+  const incN=document.getElementById('includeNursing').value==='1';
+  const incD=document.getElementById('includeDmo').value==='1';
+  const total=r=>r.roomrent+(incN?r.nursing:0)+(incD?r.dmo:0);
+  let pool=data.filter(r=>{
+    if(selectedHosp&&r.hospid!==selectedHosp)return false;
+    if(selectedCategory&&r.category!==selectedCategory)return false;
+    if(acF&&r.ac!==acF)return false;
+    return true;
+  });
+  const insurersInPool=[...new Set(pool.map(r=>r.insurer))].filter(i=>i!==baseInsurer).sort();
+  const baseMap={};
+  data.forEach(r=>{
+    if(r.insurer!==baseInsurer)return;
+    const k=r.hospid+'|'+r.category+'|'+r.ac;
+    if(!baseMap[k])baseMap[k]=[];baseMap[k].push(total(r));
+  });
+  const variantGroups={};
+  Object.keys(baseMap).forEach(k=>{variantGroups[k]=[...new Set(baseMap[k].map(v=>Math.round(v)))].length>1;});
+  const rowMap={};
+  pool.forEach(r=>{
+    const k=r.hospid+'|'+r.category+'|'+r.ac;
+    if(!rowMap[k])rowMap[k]={hospname:r.hospname,hospid:r.hospid,category:r.category,ac:r.ac,vals:{},isVariant:variantGroups[k]};
+    if(!rowMap[k].vals[r.insurer])rowMap[k].vals[r.insurer]=[];
+    rowMap[k].vals[r.insurer].push(total(r));
+  });
+  let matched=[];
+  Object.values(rowMap).forEach(row=>{
+    const baseVals=row.vals[baseInsurer]||baseMap[row.hospid+'|'+row.category+'|'+row.ac]||[];
+    if(!row.vals[baseInsurer]&&baseVals.length===0)return;
+    const baseVal=(row.vals[baseInsurer]&&row.vals[baseInsurer][0])??(baseVals[0]??null);
+    let passes=varianceMode==='all';
+    insurersInPool.forEach(ins=>{
+      const vals=row.vals[ins];if(!vals||!vals.length)return;
+      const v=vals[0];
+      const ref=row.isVariant?baseVals.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a,baseVals[0]):(baseVal??baseVals[0]);
+      if(ref===null||ref===undefined)return;
+      const diff=v-ref;
+      if(varianceMode==='minus'&&diff<0)passes=true;
+      if(varianceMode==='plus'&&diff>0)passes=true;
+    });
+    if(varianceMode!=='all'&&!passes)return;
+    matched.push({...row,baseVal,baseVals});
+  });
+  matched.sort((a,b)=>a.hospname.localeCompare(b.hospname)||a.category.localeCompare(b.category));
+  allMatchedRows=matched;currentInsurersInPool=insurersInPool;
+  document.getElementById('theadRow').innerHTML=
+    `<th>Hospital</th><th>Room Category</th><th>AC</th><th class="basecol">${baseInsurer} (Base)</th>`+
+    insurersInPool.map(i=>`<th>${i}</th>`).join('');
+  const avgDiffs=[];
+  matched.forEach(r=>insurersInPool.forEach(ins=>{const v=r.vals[ins];if(v&&r.baseVal)avgDiffs.push((v[0]-r.baseVal)/r.baseVal*100);}));
+  const avg=avgDiffs.length?(avgDiffs.reduce((a,b)=>a+b,0)/avgDiffs.length):0;
+  document.getElementById('summaryStrip').innerHTML=`
+    <div class="stat"><div class="v">${matched.length.toLocaleString()}</div><div class="l">Matched rows</div></div>
+    <div class="stat"><div class="v">${insurersInPool.length}</div><div class="l">Insurers compared</div></div>
+    <div class="stat"><div class="v" style="color:${avg>0?'var(--bad)':avg<0?'var(--good)':'var(--muted)'}">${avg>0?'+':''}${avg.toFixed(1)}%</div><div class="l">Avg variance vs base</div></div>`;
+  document.getElementById('matchCount').textContent=`Match count: ${matched.length.toLocaleString()}`;
+  renderMultiPage();
+}
+
+function renderMultiPage(){
+  const ins=currentInsurersInPool,total=allMatchedRows.length;
+  const maxPage=Math.max(1,Math.ceil(total/pageSize));
+  if(currentPage>maxPage)currentPage=maxPage;
+  const pageRows=allMatchedRows.slice((currentPage-1)*pageSize,currentPage*pageSize);
+  const frag=document.createDocumentFragment();
+  pageRows.forEach(row=>{
+    const tr=document.createElement('tr');
+    let html=`<td>${row.hospname}</td><td>${row.category}${row.isVariant?' <span style="font-size:9.5px;color:var(--muted);font-style:italic;">(variant)*</span>':''}</td><td>${row.ac||'—'}</td>`;
+    html+=`<td class="basecol">${row.baseVal!==null?fmt(row.baseVal):'—'}</td>`;
+    ins.forEach(i=>{
+      const vals=row.vals[i];
+      if(!vals||!vals.length){html+='<td>—</td>';return;}
+      const v=vals[0];
+      const ref=row.isVariant?row.baseVals.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a,row.baseVals[0]):(row.baseVal??row.baseVals[0]);
+      let cell=fmt(v);
+      if(ref!==null&&ref!==undefined){
+        const diff=v-ref,pct=ref?(diff/ref*100):0;
+        cell+=` <span class="badge ${diff>0?'up':diff<0?'down':'same'}">${diff>0?'+':''}${pct.toFixed(0)}%</span>`;
+      }
+      html+=`<td>${cell}</td>`;
+    });
+    tr.innerHTML=html;frag.appendChild(tr);
+  });
+  const tbody=document.getElementById('resultsBody');
+  tbody.innerHTML='';tbody.appendChild(frag);
+  document.getElementById('pageInfo').textContent=total===0?'No rows':`Page ${currentPage} of ${maxPage} (${total.toLocaleString()} rows)`;
+  lastRenderRows=allMatchedRows.map(r=>({hospital:r.hospname,category:r.category,ac:r.ac,base:r.baseVal,vals:r.vals}));
+}
+
+function exportMultiCsv(){
+  if(!lastRenderRows.length){alert('No rows to export.');return;}
+  const ins=[...new Set(lastRenderRows.flatMap(r=>Object.keys(r.vals)))];
+  const lines=[['Hospital','Category','AC','Base Total',...ins].join(',')];
+  lastRenderRows.forEach(r=>{
+    lines.push([r.hospital,r.category,r.ac,r.base??'',...ins.map(i=>r.vals[i]?r.vals[i][0]:'')].map(v=>`"${v}"`).join(','));
+  });
+  dlCsv(lines.join('\n'),'roomguard_multi.csv');
+}
+
+// ── H2H – Ward Category multi-select dropdown ─────────────────────────────────
+function populateH2HControls(){
+  const insurers=[...new Set(data.map(r=>r.insurer))].sort();
+  const cats=[...new Set(data.map(r=>r.category))].sort();
+
+  // Insurer selects
+  const aEl=document.getElementById('h2hA'),bEl=document.getElementById('h2hB');
+  aEl.innerHTML='';bEl.innerHTML='';
+  insurers.forEach((ins,i)=>{
+    aEl.appendChild(Object.assign(document.createElement('option'),{value:ins,textContent:ins,selected:ins.toLowerCase().includes('medi assist')}));
+    bEl.appendChild(Object.assign(document.createElement('option'),{value:ins,textContent:ins,selected:i===1}));
+  });
+
+  // Ward category checkboxes
+  selectedCats=new Set(cats); // default: all selected
+  const box=document.getElementById('catCheckboxes');
+  box.innerHTML='';
+  cats.forEach(c=>{
+    const lbl=document.createElement('label');
+    const cb=document.createElement('input');
+    cb.type='checkbox';cb.value=c;cb.checked=true;
+    cb.addEventListener('change',()=>{
+      if(cb.checked)selectedCats.add(c); else selectedCats.delete(c);
+      updateCatBtn();h2hPage=1;renderH2H();
+    });
+    lbl.appendChild(cb);lbl.appendChild(document.createTextNode(' '+c));
+    box.appendChild(lbl);
+  });
+  document.getElementById('selAll').onclick=()=>{
+    selectedCats=new Set(cats);
+    box.querySelectorAll('input[type=checkbox]').forEach(cb=>{cb.checked=true;});
+    updateCatBtn();h2hPage=1;renderH2H();
+  };
+  document.getElementById('selNone').onclick=()=>{
+    selectedCats=new Set();
+    box.querySelectorAll('input[type=checkbox]').forEach(cb=>{cb.checked=false;});
+    updateCatBtn();h2hPage=1;renderH2H();
+  };
+  // Toggle menu open/close
+  const catBtn=document.getElementById('catBtn'),catMenu=document.getElementById('catMenu');
+  catBtn.onclick=e=>{e.stopPropagation();catMenu.classList.toggle('open');};
+  document.addEventListener('click',e=>{if(!document.getElementById('catDropdown').contains(e.target))catMenu.classList.remove('open');});
+  updateCatBtn();
+
+  // Other controls
+  [aEl,bEl,document.getElementById('h2hAcFilter'),document.getElementById('h2hNursing'),document.getElementById('h2hDmo')]
+    .forEach(el=>el.addEventListener('change',()=>{h2hPage=1;renderH2H();}));
+  document.getElementById('h2hExport').onclick=exportH2HCsv;
+  document.getElementById('h2hPageSize').addEventListener('change',e=>{h2hPageSize=parseInt(e.target.value);h2hPage=1;renderH2HPage();});
+  document.getElementById('h2hPrev').onclick=()=>{if(h2hPage>1){h2hPage--;renderH2HPage();}};
+  document.getElementById('h2hNext').onclick=()=>{const max=Math.max(1,Math.ceil(h2hAllRows.length/h2hPageSize));if(h2hPage<max){h2hPage++;renderH2HPage();}};
+}
+
+function updateCatBtn(){
+  const allCats=[...new Set(data.map(r=>r.category))];
+  const btn=document.getElementById('catBtn');
+  if(selectedCats.size===0) btn.textContent='None selected ▾';
+  else if(selectedCats.size===allCats.length) btn.textContent='All Categories ▾';
+  else btn.textContent=`${selectedCats.size} categories selected ▾`;
+}
+
+function setH2HVariance(mode){
+  h2hVarianceMode=mode;h2hPage=1;
+  document.querySelectorAll('#h2hVbtnGrp .vbtn').forEach(b=>b.classList.remove('active'));
+  const ids={all:'h2hVAll',a:'h2hVA',b:'h2hVB',same:'h2hVSame',na:'h2hVNA',dtd:'h2hVDtd'};
+  document.getElementById(ids[mode]).classList.add('active');
+  renderH2H();
+}
+
+// ── Remark logic ──────────────────────────────────────────────────────────────
+function remark(aVal,bVal,aName,bName){
+  const aHas=aVal!==null&&aVal!==undefined&&aVal>0;
+  const bHas=bVal!==null&&bVal!==undefined&&bVal>0;
+  if(!aHas&&!bHas) return{text:'—',cls:'same',mode:'same'};
+  if(!aHas)        return{text:`${aName} Rate Missing`,cls:'na',mode:'na'};
+  if(!bHas)        return{text:`${bName} Rate Missing`,cls:'na',mode:'na'};
+  if(aVal<bVal)    return{text:`${aName} Better`,cls:'a',mode:'a'};
+  if(bVal<aVal)    return{text:`${bName} Better`,cls:'b',mode:'b'};
+  return{text:'Same Price',cls:'same',mode:'same'};
+}
+
+function overallRemark(rems,aName,bName){
+  const modes=rems.map(r=>r.mode);
+  const aCount=modes.filter(m=>m==='a').length;
+  const bCount=modes.filter(m=>m==='b').length;
+  const sameCount=modes.filter(m=>m==='same').length;
+  const naCount=modes.filter(m=>m==='na').length;
+  const validCount=aCount+bCount+sameCount; // exclude NA from majority calc
+
+  // All same price
+  if(aCount===0&&bCount===0&&naCount===0) return{text:'Same Price',cls:'same',mode:'same'};
+  // All missing
+  if(naCount===modes.length) return{text:'No Rates Available',cls:'na',mode:'na'};
+  // One insurer has ALL rates missing for compared wards
+  if(aCount===0&&bCount===0&&naCount>0) return{text:'Rate Missing',cls:'na',mode:'na'};
+  // Mixed: both A and B are better in at least one ward each → Difficult to Decide
+  if(aCount>0&&bCount>0) return{text:'Difficult to Decide',cls:'dtd',mode:'dtd'};
+  // Clear majority: A better in all valid wards
+  if(aCount>0&&bCount===0) return{text:`${aName} Better`,cls:'a',mode:'a'};
+  // Clear majority: B better in all valid wards
+  if(bCount>0&&aCount===0) return{text:`${bName} Better`,cls:'b',mode:'b'};
+  return{text:'Difficult to Decide',cls:'dtd',mode:'dtd'};
+}
+
+// ── H2H Render ────────────────────────────────────────────────────────────────
+function renderH2H(){
+  const aName=document.getElementById('h2hA').value;
+  const bName=document.getElementById('h2hB').value;
+  const acF=document.getElementById('h2hAcFilter').value;
+  const incN=document.getElementById('h2hNursing').value==='1';
+  const incD=document.getElementById('h2hDmo').value==='1';
+  const total=r=>r.roomrent+(incN?r.nursing:0)+(incD?r.dmo:0);
+
+  const cats=[...selectedCats].sort();
+  if(cats.length===0){document.getElementById('h2hBody').innerHTML='';document.getElementById('h2hSummary').innerHTML='';return;}
+
+  let pool=data.filter(r=>{
+    if(selectedHosp&&r.hospid!==selectedHosp)return false;
+    if(acF&&r.ac!==acF)return false;
+    return true;
+  });
+
+  // Group by hospital
+  const hospMap={};
+  pool.forEach(r=>{
+    if(!hospMap[r.hospid])hospMap[r.hospid]={name:r.hospname,id:r.hospid,data:{}};
+    const k=r.category+'|'+r.insurer;
+    if(!hospMap[r.hospid].data[k])hospMap[r.hospid].data[k]=[];
+    hospMap[r.hospid].data[k].push(total(r));
+  });
+
+  let rows=Object.values(hospMap).map(h=>{
+    const catVals={};
+    cats.forEach(cat=>{
+      const aR=h.data[cat+'|'+aName],bR=h.data[cat+'|'+bName];
+      catVals[cat]={a:aR&&aR.length?aR[0]:null,b:bR&&bR.length?bR[0]:null};
+    });
+    const rems=cats.map(cat=>remark(catVals[cat].a,catVals[cat].b,aName,bName));
+    const overall=overallRemark(rems,aName,bName);
+    return{hospname:h.name,hospid:h.id,catVals,rems,overall};
+  });
+  rows.sort((a,b)=>a.hospname.localeCompare(b.hospname));
+
+  // Variance filter
+  if(h2hVarianceMode!=='all'){
+    rows=rows.filter(row=>{
+      const m=h2hVarianceMode;
+      if(m==='dtd') return row.overall.mode==='dtd';
+      // check if any ward-level remark matches
+      return row.rems.some(r=>r.mode===m)||(m==='na'&&row.overall.mode==='na');
+    });
+  }
+
+  h2hAllRows=rows;
+  window._h2hMeta={aName,bName,cats};
+
+  // Summary counts
+  let cntA=0,cntB=0,cntSame=0,cntNA=0,cntDtd=0;
+  rows.forEach(row=>{
+    const m=row.overall.mode;
+    if(m==='a')cntA++;else if(m==='b')cntB++;else if(m==='same')cntSame++;else if(m==='na')cntNA++;else if(m==='dtd')cntDtd++;
+  });
+  const aShortFull=aName.length>18?aName.substring(0,16)+'…':aName;
+  const bShortFull=bName.length>18?bName.substring(0,16)+'…':bName;
+  document.getElementById('h2hSummary').innerHTML=`
+    <div class="stat"><div class="v">${rows.length}</div><div class="l">Total Hospitals</div></div>
+    <div class="stat"><div class="v" style="color:#1e40af">${cntA}</div><div class="l">${aShortFull} Better</div></div>
+    <div class="stat"><div class="v" style="color:#166534">${cntB}</div><div class="l">${bShortFull} Better</div></div>
+    <div class="stat"><div class="v" style="color:var(--muted)">${cntSame}</div><div class="l">Same Price</div></div>
+    <div class="stat"><div class="v" style="color:#92400e">${cntNA}</div><div class="l">Rate Missing</div></div>
+    <div class="stat"><div class="v" style="color:#9d174d">${cntDtd}</div><div class="l">Difficult to Decide</div></div>`;
+
+  document.getElementById('h2hMatchCount').textContent=`Hospitals: ${rows.length}`;
+
+  // Build header
+  const aShort=aName.length>16?aName.substring(0,14)+'…':aName;
+  const bShort=bName.length>16?bName.substring(0,14)+'…':bName;
+  let hdr=`<tr>
+    <th rowspan="2" style="vertical-align:bottom;">HID</th>
+    <th rowspan="2" style="vertical-align:bottom;">Hospital</th>
+    <th colspan="${cats.length}" class="grphead">${aShort}</th>
+    <th colspan="${cats.length}" class="grphead2">${bShort}</th>
+    <th colspan="${cats.length}" class="grpheadR">Ward Remarks</th>
+    <th rowspan="2" class="grpheadR" style="vertical-align:bottom;border-left:2px solid #c8922a;">Overall</th>
+  </tr><tr>`;
+  cats.forEach(c=>hdr+=`<th class="basecol" style="border-left:1px solid var(--line);">${c}</th>`);
+  cats.forEach(c=>hdr+=`<th class="inscol2" style="border-left:1px solid var(--line);">${c}</th>`);
+  cats.forEach((c,i)=>hdr+=`<th style="background:#f9f5ec;${i===0?'border-left:2px solid #c8922a;':''}">${c}</th>`);
+  document.getElementById('h2hThead').innerHTML=hdr+'</tr>';
+
+  renderH2HPage();
+}
+
+function renderH2HPage(){
+  const meta=window._h2hMeta;if(!meta)return;
+  const{aName,bName,cats}=meta;
+  const total=h2hAllRows.length;
+  const maxPage=Math.max(1,Math.ceil(total/h2hPageSize));
+  if(h2hPage>maxPage)h2hPage=maxPage;
+  const pageRows=h2hAllRows.slice((h2hPage-1)*h2hPageSize,h2hPage*h2hPageSize);
+  const frag=document.createDocumentFragment();
+  pageRows.forEach(row=>{
+    const tr=document.createElement('tr');
+    let html=`<td>${row.hospid}</td><td>${row.hospname}</td>`;
+    cats.forEach((cat,i)=>{
+      const{a}=row.catVals[cat];
+      html+=`<td class="basecol"${i===0?' style="border-left:2px solid #b8c8e8;"':''}>${a!==null?fmt(a):'—'}</td>`;
+    });
+    cats.forEach((cat,i)=>{
+      const{b}=row.catVals[cat];
+      html+=`<td class="inscol2"${i===0?' style="border-left:2px solid #b8d8c8;"':''}>${b!==null?fmt(b):'—'}</td>`;
+    });
+    row.rems.forEach((rem,i)=>{
+      html+=`<td style="background:#fdfaf5;${i===0?'border-left:2px solid #c8922a;':''}"><span class="rem ${rem.cls}">${rem.text}</span></td>`;
+    });
+    html+=`<td style="background:#fdfaf5;border-left:2px solid #c8922a;"><span class="rem ${row.overall.cls}">${row.overall.text}</span></td>`;
+    tr.innerHTML=html;frag.appendChild(tr);
+  });
+  const tbody=document.getElementById('h2hBody');
+  tbody.innerHTML='';tbody.appendChild(frag);
+  document.getElementById('h2hPageInfo').textContent=total===0?'No rows':`Page ${h2hPage} of ${maxPage} (${total} rows)`;
+}
+
+function exportH2HCsv(){
+  const meta=window._h2hMeta;if(!meta||!h2hAllRows.length){alert('No data to export.');return;}
+  const{aName,bName,cats}=meta;
+  const hdr=['HID','Hospital',...cats.map(c=>`${aName} - ${c}`),...cats.map(c=>`${bName} - ${c}`),...cats.map(c=>`Remarks - ${c}`),'Overall'];
+  const lines=[hdr.join(',')];
+  h2hAllRows.forEach(row=>{
+    const line=[row.hospid,row.hospname,...cats.map(c=>row.catVals[c].a??''),...cats.map(c=>row.catVals[c].b??''),...row.rems.map(r=>r.text),row.overall.text];
+    lines.push(line.map(v=>`"${v}"`).join(','));
+  });
+  dlCsv(lines.join('\n'),'roomguard_h2h.csv');
+}
+
+function dlCsv(content,filename){
+  const blob=new Blob([content],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;a.click();
+}
+</script>
+</body>
+</html>
